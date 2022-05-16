@@ -1,13 +1,22 @@
-canary: 
+canary:
+  # Set default to disable canary
   enabled: false
+
+  # Set loadtesterUrl as ref variable to be reuse easily in webhooks field
   loadtesterUrl: &loadtesterUrl http://flagger-loadtester.flagger/
   annotations: []
   progressDeadlineSeconds: 60
+
+  # Detail of canary target
   target:
+    # This field will be use in the specs
     service:
       port: 8080
       portDiscovery: false
+    # This field is for the default targetUrl
     path: /
+  
+  # The default configuration
   analysis:
     interval: 30s
     failedThreshold: 5
@@ -17,11 +26,17 @@ canary:
       successRate:
         min: 99
         interval: 1m
+      
+      # Disable this in default, because for non-production the traffic will be very small for P99 in this metrics
       # requestDuration:
       #   # maximum req duration P99
       #   # milliseconds
       #   max: 500
       #   interval: 30s
+    
+    # Default webhooks follow by official docs
+    # We use entire webhooks field in values.yaml because this is more flexible and customizable in future
+    # and not hard to use if we consume default value
     webhooks:
       - name: acceptance-test
         type: pre-rollout
@@ -35,6 +50,8 @@ canary:
         url: *loadtesterUrl
         metadata:
           cmd: "hey -z 2m -q 10 -c 2 {{ .targetUrl }}"
+      
+      # Suggested way to custom port and path using targetDomain variable
       # - name: load-test
       #   type: rollout
       #   url: *loadtesterUrl
