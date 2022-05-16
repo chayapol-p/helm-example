@@ -1,7 +1,12 @@
+# Check if cabary is enable or not
 {{- if .Values.canary.enabled -}}
+
+# Define variable to be reuse easily
 {{- $fullName := include "deployment.fullname" . -}}
 apiVersion: flagger.app/v1beta1
 kind: Canary
+
+# Define metadata
 metadata:
   name: {{ $fullName }}
   labels: {{ include "deployment.labels" . | nindent 4 }}
@@ -14,12 +19,16 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: {{ $fullName }}
+  
+  # If this deployment enble for auto scaling we also need to config this field
   {{- if .Values.autoscaling.enabled }}
   autoscalerRef:
     apiVersion: autoscaling/v2beta1
     kind: HorizontalPodAutoscaler
     name: {{ $fullName }}
   {{- end }}
+
+  # Set the canary configuration
   progressDeadlineSeconds:  {{ .Values.canary.progressDeadlineSeconds }}
   service:
   {{- with .Values.canary.target.service }}
@@ -33,12 +42,16 @@ spec:
     stepWeight: {{ .stepWeight }}
     {{- with .metrics }}
     metrics:
+
+      # Define this if this field is set in values
       {{- if .successRate }}
     - name: request-success-rate
       thresholdRange:
         min: {{ .successRate.min }}
       interval: {{ .successRate.interval }}
       {{- end }}
+
+      # Define this if this field is set in values
       {{- if .requestDuration }}
     - name: request-duration
       thresholdRange:
@@ -49,8 +62,12 @@ spec:
   {{- end }}
     webhooks:
       {{- with .Values.canary }}
+
+        # Create default variable to be easily used by user from values
         {{- $_ := set $ "targetUrl" (printf "http://%s-canary.%s:%.0f%s" $fullName $.Release.Namespace .target.service.port .target.path) }}
         {{- $_ := set $ "targetDomain" (printf "http://%s-canary.%s" $fullName $.Release.Namespace) }}
+
+        # Use tpl over toYaml to use the variable created before. Then correct the indent of this field
         {{- tpl ( toYaml .analysis.webhooks ) $ | nindent 6}}
       {{- end }}
 {{- end }}
