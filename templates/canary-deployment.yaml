@@ -1,0 +1,56 @@
+{{- if .Values.canary.enabled -}}
+{{- $fullName := include "deployment.fullname" . -}}
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: {{ $fullName }}
+  labels: {{ include "deployment.labels" . | nindent 4 }}
+  {{- with .Values.canary.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullName }}
+  {{- if .Values.autoscaling.enabled }}
+  autoscalerRef:
+    apiVersion: autoscaling/v2beta1
+    kind: HorizontalPodAutoscaler
+    name: {{ $fullName }}
+  {{- end }}
+  progressDeadlineSeconds:  {{ .Values.canary.progressDeadlineSeconds }}
+  service:
+  {{- with .Values.canary.target.service }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.canary.analysis }}
+  analysis:
+    interval: {{ .interval }}
+    threshold: {{ .failedThreshold }}
+    maxWeight: {{ .maxWeight }}
+    stepWeight: {{ .stepWeight }}
+    {{- with .metrics }}
+    metrics:
+      {{- if .successRate }}
+    - name: request-success-rate
+      thresholdRange:
+        min: {{ .successRate.min }}
+      interval: {{ .successRate.interval }}
+      {{- end }}
+      {{- if .requestDuration }}
+    - name: request-duration
+      thresholdRange:
+        max: {{ .requestDuration.max }}
+      interval: {{ .requestDuration.interval }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+    webhooks:
+      {{- with .Values.canary }}
+        {{- $_ := set $ "targetUrl" (printf "http://%s-canary.%s:%.0f%s" $fullName $.Release.Namespace .target.service.port .target.path) }}
+        {{- $_ := set $ "targetDomain" (printf "http://%s-canary.%s" $fullName $.Release.Namespace) }}
+        {{- tpl ( toYaml .analysis.webhooks ) $ | nindent 6}}
+      {{- end }}
+{{- end }}

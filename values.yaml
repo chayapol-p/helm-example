@@ -1,0 +1,42 @@
+canary: 
+  enabled: false
+  loadtesterUrl: &loadtesterUrl http://flagger-loadtester.flagger/
+  annotations: []
+  progressDeadlineSeconds: 60
+  target:
+    service:
+      port: 8080
+      portDiscovery: false
+    path: /
+  analysis:
+    interval: 30s
+    failedThreshold: 5
+    maxWeight: 100
+    stepWeight: 5
+    metrics:
+      successRate:
+        min: 99
+        interval: 1m
+      # requestDuration:
+      #   # maximum req duration P99
+      #   # milliseconds
+      #   max: 500
+      #   interval: 30s
+    webhooks:
+      - name: acceptance-test
+        type: pre-rollout
+        url: *loadtesterUrl
+        timeout: 5s
+        metadata:
+          type: bash
+          cmd: "curl -s -XGET {{ .targetUrl }}"
+      - name: load-test
+        type: rollout
+        url: *loadtesterUrl
+        metadata:
+          cmd: "hey -z 2m -q 10 -c 2 {{ .targetUrl }}"
+      # - name: load-test
+      #   type: rollout
+      #   url: *loadtesterUrl
+      #   metadata:
+      #     cmd: "hey -z 2m -q 10 -c 2 {{ .targetDomain }}:8081/token"
